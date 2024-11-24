@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Booking System</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <h1>Booking System</h1>
+
+    <!-- Registration form -->
+    <h2>Register</h2>
+    <form id="register-form">
+        <input type="text" id="register-username" placeholder="Username" required>
+        <input type="password" id="register-password" placeholder="Password" required>
+        <button type="submit">Register</button>
+    </form>
+
+    <!-- Login form -->
+    <h2>Login</h2>
+    <form id="login-form">
+        <input type="text" id="login-username" placeholder="Username" required>
+        <input type="password" id="login-password" placeholder="Password" required>
+        <button type="submit">Login</button>
+    </form>
+
+    <!-- Booking form (only visible after login) -->
+    <h2>Make a Booking</h2>
+    <form id="booking-form" style="display:none;">
+        <input type="text" id="booking-room" placeholder="Room Name" required>
+        <label for="booking-start">Start Time:</label>
+        <input type="datetime-local" id="booking-start" required>
+        <label for="booking-end">End Time:</label>
+        <input type="datetime-local" id="booking-end" required>
+        <button type="submit">Book</button>
+    </form>
+
+    <!-- Bookings list -->
+    <h2>Bookings</h2>
+    <div id="booking-list"></div>
+
+    <script>
+        const apiEndpoints = {
+            auth: 'http://localhost:8081',
+            booking: 'http://localhost:8082',
+        };
+
+        document.getElementById('register-form').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const username = document.getElementById('register-username').value.trim();
+            const password = document.getElementById('register-password').value.trim();
+            try {
+                const response = await fetch(`${apiEndpoints.auth}/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const result = await response.json();
+                alert(result.message || result.error);
+            } catch (error) {
+                console.error('Ошибка при регистрации:', error);
+            }
+        });
+
+        document.getElementById('login-form').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const username = document.getElementById('login-username').value.trim();
+            const password = document.getElementById('login-password').value.trim();
+            try {
+                const response = await fetch(`${apiEndpoints.auth}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    alert('Login successful');
+                    localStorage.setItem('authToken', result.token);
+                    document.getElementById('booking-form').style.display = 'block';
+                    fetchBookings();
+                } else {
+                    alert(result.error);
+                }
+            } catch (error) {
+                console.error('Ошибка при входе:', error);
+            }
+        });
+
+        document.getElementById('booking-form').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const roomName = document.getElementById('booking-room').value.trim();
+            const startTime = new Date(document.getElementById('booking-start').value);
+            const endTime = new Date(document.getElementById('booking-end').value);
+
+            if (!startTime || !endTime || endTime <= startTime) {
+                alert('Пожалуйста, введите корректный интервал времени.');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${apiEndpoints.booking}/book`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                    },
+                    body: JSON.stringify({ room_name: roomName, start_time: startTime.toISOString(), end_time: endTime.toISOString() })
+                });
+                const result = await response.json();
+                alert(result.message || result.error);
+                if (response.ok) fetchBookings();
+            } catch (error) {
+                console.error('Ошибка при создании брони:', error);
+            }
+        });
+
+        async function fetchBookings() {
+            try {
+                const response = await fetch(`${apiEndpoints.booking}/bookings`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                    }
+                });
+                const result = await response.json();
+
+                if (response.ok && Array.isArray(result.bookings)) {
+                    const bookingList = document.getElementById('booking-list');
+                    bookingList.innerHTML = result.bookings.map(booking => {
+                        const bookingStart = new Date(booking.start_time);
+                        const bookingEnd = new Date(booking.end_time);
+                        return `<p>${booking.room_name} - ${!isNaN(bookingStart.getTime()) ? bookingStart.toLocaleString() : "Неверная дата"} to ${!isNaN(bookingEnd.getTime()) ? bookingEnd.toLocaleString() : "Неверная дата"}</p>`;
+                    }).join('');
+                } else {
+                    alert(result.error);
+                }
+            } catch (error) {
+                console.error('Ошибка при получении списка бронирований:', error);
+            }
+        }
+        
+        if (localStorage.getItem('authToken')) {
+            document.getElementById('booking-form').style.display = 'block'; // Показываем форму бронирования если токен уже существует
+            fetchBookings();
+        }
+    </script>
+</body>
+</html>
+

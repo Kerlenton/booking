@@ -1,0 +1,43 @@
+services:
+  auth-service:
+    build: ./auth-service
+    ports:
+      - "8081:8081"
+    environment:
+      - DATABASE_URL=postgres://user:password@postgres:5432/booking_db
+    depends_on:
+      - postgres
+
+  booking-service:
+    build: ./booking-service
+    ports:
+      - "8082:8082"
+    environment:
+      - DATABASE_URL=postgres://user:password@postgres:5432/booking_db
+    depends_on:
+      - postgres
+
+  notification-service:
+    build: ./notification-service
+    ports:
+      - "8083:8083"
+
+  client:
+    build: ./client
+    ports:
+      - "3000:3000"
+
+  postgres:
+    image: postgres:latest
+    restart: always
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: booking_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
